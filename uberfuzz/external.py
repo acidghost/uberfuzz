@@ -52,7 +52,10 @@ class ExternalFuzzer(object):
         pass
 
     def __del__(self):
-        self.kill()
+        try:
+            self.kill()
+        except Exception:
+            pass
 
 
 class Driller(ExternalFuzzer):
