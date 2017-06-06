@@ -3,22 +3,36 @@
 import os
 import signal
 import subprocess
+import logging
 
 import fuzzer
 import driller
 
 
+LOG_LEVEL = logging.DEBUG
+
+
 class ExternalFuzzer(object):
     '''External fuzzer abstract class'''
+    # pylint: disable=too-many-instance-attributes,too-many-arguments
 
-    def __init__(self, binary_path, work_dir, identifier, seeds):
+    def __init__(self, binary_path, work_dir, identifier, seeds, read_from_file=None,
+                 target_opts=None):
         self.binary_path = binary_path
         self.work_dir = work_dir
         self.identifier = identifier
         self.fuzzer_dir = os.path.join(work_dir, identifier)
+
         self.binary_name = os.path.basename(binary_path)
+        self.read_from_file = read_from_file
+        self.target_opts = target_opts
+
+        self._log = logging.getLogger(self.identifier)
+        self._log.setLevel(LOG_LEVEL)
+
         if not identifier in os.listdir(work_dir):
             os.makedirs(self.fuzzer_dir)
+
         if isinstance(seeds, basestring):
             self.seeds = [seeds]
         else:
@@ -77,15 +91,16 @@ class Driller(ExternalFuzzer):
     '''Driller interface'''
 
     def __init__(self, binary_path, work_dir, afl_count=1, driller_count=1,
-                 time_limit=None, seeds='fuzz'):
+                 time_limit=None, seeds='fuzz', read_from_file=None, target_opts=None):
         # pylint: disable=too-many-arguments
-        super(Driller, self).__init__(binary_path, work_dir, "driller", seeds)
+        super(Driller, self).__init__(binary_path, work_dir, "driller", seeds, read_from_file)
         self.time_limit = time_limit
 
         drill_callback = driller.LocalCallback(num_workers=driller_count)
+        extra_opts = ["-f", read_from_file] if read_from_file else None
         self.driller = fuzzer.Fuzzer(binary_path, self.fuzzer_dir, time_limit=time_limit,
                                      afl_count=afl_count, stuck_callback=drill_callback,
-                                     seeds=seeds)
+                                     seeds=self.seeds, extra_opts=extra_opts, target_opts=target_opts)
 
     def start(self):
         self.driller.start()
@@ -117,10 +132,12 @@ class Driller(ExternalFuzzer):
 
 class AFLFast(ExternalFuzzer):
     '''AFL Fast interface'''
-    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-instance-attributes,too-many-arguments
 
-    def __init__(self, binary_path, work_dir, seeds='fuzz'):
-        super(AFLFast, self).__init__(binary_path, work_dir, "aflfast", seeds)
+    def __init__(self, binary_path, work_dir, seeds='fuzz', read_from_file=None,
+                 target_opts=None):
+        super(AFLFast, self).__init__(binary_path, work_dir, "aflfast", seeds,
+                                      read_from_file, target_opts=target_opts)
 
         self.fuzzer_binary_dir = os.path.join(self.fuzzer_dir, self.binary_name)
         self.sync_dir = os.path.join(self.fuzzer_binary_dir, "sync")
@@ -153,11 +170,17 @@ class AFLFast(ExternalFuzzer):
         args += ["-m", "8G"]
         args += ["-Q"]
 
+        if self.read_from_file:
+            args += ["-f", self.read_from_file]
+
         args += ["--"]
         args += [self.binary_path]
+        if self.target_opts:
+            args += self.target_opts
 
         outfile = "%s.log" % self.identifier
         with open(os.path.join(self.fuzzer_binary_dir, outfile), 'w') as f:
+            self._log.debug('Running AFLFast instance "%s"', ' '.join(args))
             self.process = subprocess.Popen(args, stdout=f, close_fds=True)
 
     def kill(self):

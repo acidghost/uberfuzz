@@ -1,11 +1,22 @@
+#!/usr/bin/env python
+
 import sys
 import os
-import uberfuzz
 import time
+import argparse
+import logging
+
+import uberfuzz
 
 
-def main(binary_path, work_dir):
-    uber = uberfuzz.Uberfuzz(binary_path, work_dir, logging_time_interval=1)
+LOG = logging.getLogger()
+LOG.setLevel(logging.INFO)
+
+
+def main(args):
+    uber = uberfuzz.Uberfuzz(args.binary, args.work_dir, logging_time_interval=1,
+                             read_from_file=args.reads_file, target_opts=args.extra_opts.split(' '))
+    LOG.info('Starting Uberfuzz on %s', args.binary)
     uber.start()
     try:
         while True:
@@ -14,9 +25,12 @@ def main(binary_path, work_dir):
         uber.kill()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print 'Usage: %s binary_path [work_dir]' % os.path.basename(sys.argv[0])
-        sys.exit()
-    default_work_dir = os.path.join(os.path.dirname(__file__), "work")
-    work_dir = sys.argv[2] if len(sys.argv) > 2 else default_work_dir
-    main(sys.argv[1], work_dir)
+    parser = argparse.ArgumentParser(description="Uberfuzz runner")
+    parser.add_argument('binary', help='Binary to fuzz')
+    parser.add_argument('-w', '--work-dir', help='Working directory for fuzzers',
+                        default=os.path.join(os.path.dirname(__file__), "work"))
+    parser.add_argument('-f', '--reads-file', help='If binary reads from a specific file')
+    parser.add_argument('--extra-opts', help='Extra cmd line options for target')
+    args = parser.parse_args()
+
+    main(args)

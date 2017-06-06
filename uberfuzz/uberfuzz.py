@@ -52,20 +52,22 @@ class Uberfuzz(object):
 
     def __init__(self, binary_path, work_dir, use_driller=True, use_aflfast=True,
                  pollenation_interval=10, callback_time_interval=None, callback_fn=None,
-                 logging_time_interval=None):
+                 logging_time_interval=None, read_from_file=None, target_opts=None):
         # pylint: disable=too-many-arguments
         self.binary_path = binary_path
         self.work_dir = work_dir
 
         self.fuzzers = []
         if use_driller:
-            self.driller = Driller(binary_path, work_dir)
+            self.driller = Driller(binary_path, work_dir, read_from_file=read_from_file,
+                                   target_opts=target_opts)
             self.fuzzers.append(self.driller)
         else:
             self.driller = None
 
         if use_aflfast:
-            self.aflfast = AFLFast(binary_path, work_dir)
+            self.aflfast = AFLFast(binary_path, work_dir, read_from_file=read_from_file,
+                                   target_opts=target_opts)
             self.fuzzers.append(self.aflfast)
         else:
             self.aflfast = None
@@ -93,8 +95,11 @@ class Uberfuzz(object):
 
     def start(self):
         '''Starts fuzzing'''
+        l.info('Starting fuzzers')
+
         for fuzzer in self.fuzzers:
             fuzzer.start()
+            l.info('%14s started | %s', fuzzer.identifier, fuzzer.binary_path)
         for timer in self._timers:
             timer.start()
 

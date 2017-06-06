@@ -57,7 +57,7 @@ singledispatch==3.4.0.3
 six==1.10.0
 termcolor==1.1.0
 tqdm==4.14.0
-tracer==0.1.0
+git+https://github.com/angr/tracer.git#egg=tracer
 traitlets==4.3.2
 unicorn==1.0.1
 vine==1.1.3
