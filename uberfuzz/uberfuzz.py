@@ -2,8 +2,10 @@
 
 import threading
 import logging
+import operator as op
 
 from .external import Driller, AFLFast
+from .score import Scorer
 
 
 l = logging.getLogger('uberfuzz')
@@ -51,11 +53,20 @@ class Uberfuzz(object):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, binary_path, work_dir, use_driller=True, use_aflfast=True,
-                 pollenation_interval=10, callback_time_interval=None, callback_fn=None,
+                 pollenation_interval=30, callback_time_interval=None, callback_fn=None,
                  logging_time_interval=None, read_from_file=None, target_opts=None):
         # pylint: disable=too-many-arguments
         self.binary_path = binary_path
         self.work_dir = work_dir
+
+        if target_opts and '@@' in target_opts:
+            if read_from_file:
+                scorer_file = read_from_file
+                read_from_file = None
+            else:
+                # this is to allow the scorer to work properly (future TODO)
+                raise ValueError('read_from_file has to be set if giving file with @@')
+        self._scorer = Scorer(binary_path, extra_opts=target_opts, reads_file=scorer_file)
 
         self.fuzzers = []
         if use_driller:
@@ -129,13 +140,34 @@ class Uberfuzz(object):
     def _pollenation_callback(self):
         if not self.driller or not self.aflfast:
             return
+
         driller_queue = self.driller.queue
         driller_pollenated = self.driller.pollenated
         driller_all = list(set(driller_queue).union(set(driller_pollenated)))
         aflfast_pollen = [x for x in self.aflfast.queue if x not in driller_all]
-        if len(aflfast_pollen) > 0:
-            self.driller.pollenate(aflfast_pollen)
-        l.info('Pollenated %d into driller', len(aflfast_pollen))
+
+        scored_pollen = []
+        aflfast_pollen_n = len(aflfast_pollen)
+        for i in xrange(aflfast_pollen_n):
+            pollen = aflfast_pollen[i]
+            l.info('Scoring pollen %4d / %d...', i+1, aflfast_pollen_n)
+            scored_pollen.append((self._scorer(pollen), pollen))
+        sorted_pollen_score = sorted(scored_pollen, key=op.itemgetter(0), reverse=True)
+        sorted_pollen = [x[1] for x in sorted_pollen_score]
+
+        all_pollen_len = len(sorted_pollen)
+        if all_pollen_len > 0:
+            selection_pressure = 0.4
+            selected_n = all_pollen_len * selection_pressure
+            selected_pollen = sorted_pollen[1 : int(selected_n)]
+            elite_pollen = sorted_pollen[0]
+            final_pollen = []
+            final_pollen.append(elite_pollen)
+            final_pollen.extend(selected_pollen)
+            self.driller.pollenate(final_pollen)
+
+            l.info('Elite pollen length %6d', len(elite_pollen))
+            l.info('Selected #pollen    %6d', selected_n)
 
     def _logging_callback(self):
         for fuzzer in self.fuzzers:

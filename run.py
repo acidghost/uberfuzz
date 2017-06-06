@@ -9,13 +9,14 @@ import logging
 import uberfuzz
 
 
-LOG = logging.getLogger()
+LOG = logging.getLogger('uber-runner')
 LOG.setLevel(logging.INFO)
 
 
 def main(args):
     uber = uberfuzz.Uberfuzz(args.binary, args.work_dir, logging_time_interval=1,
-                             read_from_file=args.reads_file, target_opts=args.extra_opts.split(' '))
+                             read_from_file=args.reads_file, target_opts=args.extra_opts.split(' '),
+                             pollenation_interval=5)
     LOG.info('Starting Uberfuzz on %s', args.binary)
     uber.start()
     try:
