@@ -1,13 +1,17 @@
-import fuzzer
-import driller
+'''External fuzzers interfaces'''
+
 import os
 import signal
 import subprocess
 
+import fuzzer
+import driller
+
 
 class ExternalFuzzer(object):
+    '''External fuzzer abstract class'''
 
-    def __init__(self, binary_path, work_dir, identifier):
+    def __init__(self, binary_path, work_dir, identifier, seeds):
         self.binary_path = binary_path
         self.work_dir = work_dir
         self.identifier = identifier
@@ -15,26 +19,36 @@ class ExternalFuzzer(object):
         self.binary_name = os.path.basename(binary_path)
         if not identifier in os.listdir(work_dir):
             os.makedirs(self.fuzzer_dir)
+        if isinstance(seeds, basestring):
+            self.seeds = [seeds]
+        else:
+            self.seeds = seeds
 
     def start(self):
+        '''Starts fuzzing'''
         pass
 
     def kill(self):
+        '''Kills fuzzer'''
         pass
 
     @property
     def queue(self):
+        '''List of queued testcases'''
         pass
 
     @property
     def crashes(self):
+        '''List of crashing testcases'''
         pass
 
     @property
     def stats(self):
+        '''Fuzzer stats'''
         pass
 
     def pollenate(self, testcases):
+        '''Inject testcases into the fuzzer'''
         pass
 
     @staticmethod
@@ -49,28 +63,29 @@ class ExternalFuzzer(object):
 
     @property
     def pollenated(self):
+        '''List of injected testcases'''
         pass
 
     def __del__(self):
         try:
             self.kill()
-        except Exception:
+        except OSError:
             pass
 
 
 class Driller(ExternalFuzzer):
+    '''Driller interface'''
 
-    def __init__(
-        self, binary_path, work_dir, afl_count=1, driller_count=1,
-        time_limit=None, seeds=['fuzz']
-    ):
-        super(Driller, self).__init__(binary_path, work_dir, "driller")
+    def __init__(self, binary_path, work_dir, afl_count=1, driller_count=1,
+                 time_limit=None, seeds='fuzz'):
+        # pylint: disable=too-many-arguments
+        super(Driller, self).__init__(binary_path, work_dir, "driller", seeds)
         self.time_limit = time_limit
-        self.seeds = seeds
 
         drill_callback = driller.LocalCallback(num_workers=driller_count)
         self.driller = fuzzer.Fuzzer(binary_path, self.fuzzer_dir, time_limit=time_limit,
-            afl_count=afl_count, stuck_callback=drill_callback, seeds=seeds)
+                                     afl_count=afl_count, stuck_callback=drill_callback,
+                                     seeds=seeds)
 
     def start(self):
         self.driller.start()
@@ -101,9 +116,11 @@ class Driller(ExternalFuzzer):
 
 
 class AFLFast(ExternalFuzzer):
+    '''AFL Fast interface'''
+    # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, binary_path, work_dir, seeds=['fuzz']):
-        super(AFLFast, self).__init__(binary_path, work_dir, "aflfast")
+    def __init__(self, binary_path, work_dir, seeds='fuzz'):
+        super(AFLFast, self).__init__(binary_path, work_dir, "aflfast", seeds)
 
         self.fuzzer_binary_dir = os.path.join(self.fuzzer_dir, self.binary_name)
         self.sync_dir = os.path.join(self.fuzzer_binary_dir, "sync")
@@ -111,7 +128,6 @@ class AFLFast(ExternalFuzzer):
         self.input_dir = '-' if self.resuming else os.path.join(self.fuzzer_binary_dir, "input")
         self.process = None
         self.afl_path = os.environ['AFLFAST_PATH']
-        self.seeds = seeds
 
     def start(self):
         args = [self.afl_path]
@@ -153,18 +169,18 @@ class AFLFast(ExternalFuzzer):
     @property
     def queue(self):
         queue_path = os.path.join(self.sync_dir, "queue")
-        queue_files = filter(lambda x: x != ".state", os.listdir(queue_path))
+        queue_files = [x for x in os.listdir(queue_path) if x != '.state']
 
         queue_l = []
-        for q in queue_files:
-            with open(os.path.join(queue_path, q), 'rb') as f:
+        for queue_file in queue_files:
+            with open(os.path.join(queue_path, queue_file), 'rb') as f:
                 queue_l.append(f.read())
 
         return queue_l
 
     @property
     def crashes(self):
-        SIGNALS = [signal.SIGSEGV, signal.SIGILL]
+        signals = [signal.SIGSEGV, signal.SIGILL]
         crashes = set()
         crashes_dir = os.path.join(self.sync_dir, "crashes")
         if not os.path.isdir(crashes_dir):
@@ -175,9 +191,10 @@ class AFLFast(ExternalFuzzer):
                 # skip the readme entry
                 continue
 
-            attrs = dict(map(lambda x: (x[0], x[-1]), map(lambda y: y.split(":"), crash.split(","))))
+            attrs_arr = [y.split(':') for y in crash.split(',')]
+            attrs = dict([(x[0], x[-1]) for x in attrs_arr])
 
-            if int(attrs['sig']) not in SIGNALS:
+            if int(attrs['sig']) not in signals:
                 continue
 
             crash_path = os.path.join(crashes_dir, crash)

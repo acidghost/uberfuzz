@@ -1,14 +1,19 @@
-from .external import Driller, AFLFast
+'''Main module for fuzzers cooperation'''
+
 import threading
 import logging
+
+from .external import Driller, AFLFast
+
 
 l = logging.getLogger('uberfuzz')
 l.setLevel(logging.DEBUG)
 
 
 #  http://stackoverflow.com/a/41450617
-class InfiniteTimer():
+class InfiniteTimer(object):
     """A Timer class that does not stop, unless you want it to."""
+    # pylint: disable=missing-docstring
 
     def __init__(self, seconds, target):
         self._should_continue = False
@@ -42,12 +47,13 @@ class InfiniteTimer():
 
 
 class Uberfuzz(object):
+    '''Let those fuzzers cooperate!'''
+    # pylint: disable=too-many-instance-attributes
 
-    def __init__(
-        self, binary_path, work_dir, use_driller=True, use_aflfast=True,
-        pollenation_interval=10, callback_time_interval=None, callback_fn=None,
-        logging_time_interval=None
-    ):
+    def __init__(self, binary_path, work_dir, use_driller=True, use_aflfast=True,
+                 pollenation_interval=10, callback_time_interval=None, callback_fn=None,
+                 logging_time_interval=None):
+        # pylint: disable=too-many-arguments
         self.binary_path = binary_path
         self.work_dir = work_dir
 
@@ -71,7 +77,7 @@ class Uberfuzz(object):
 
         self.callback_time_interval = callback_time_interval
         self.callback_fn = callback_fn
-        if callback_time_interval == None and callback_fn == None:
+        if callback_time_interval is None and callback_fn is None:
             self._callback_timer = None
         else:
             self._callback_timer = InfiniteTimer(callback_time_interval, callback_fn)
@@ -80,18 +86,20 @@ class Uberfuzz(object):
         self.logging_time_interval = logging_time_interval
         if logging_time_interval:
             self._logging_timer = InfiniteTimer(logging_time_interval,
-                self._logging_callback)
+                                                self._logging_callback)
             self._timers.append(self._logging_timer)
         else:
             self._logging_timer = None
 
     def start(self):
+        '''Starts fuzzing'''
         for fuzzer in self.fuzzers:
             fuzzer.start()
         for timer in self._timers:
             timer.start()
 
     def kill(self):
+        '''Kills fuzzers'''
         for fuzzer in self.fuzzers:
             fuzzer.kill()
         for timer in self._timers:
@@ -99,6 +107,7 @@ class Uberfuzz(object):
 
     @property
     def queue(self):
+        '''List of queued testcases for each fuzzer'''
         queue = {}
         for fuzzer in self.fuzzers:
             queue[fuzzer.identifier] = fuzzer.queue
@@ -106,6 +115,7 @@ class Uberfuzz(object):
 
     @property
     def crashes(self):
+        '''List of crashing testcases for each fuzzer'''
         crashes = {}
         for fuzzer in self.fuzzers:
             crashes[fuzzer.identifier] = fuzzer.crashes
@@ -117,7 +127,7 @@ class Uberfuzz(object):
         driller_queue = self.driller.queue
         driller_pollenated = self.driller.pollenated
         driller_all = list(set(driller_queue).union(set(driller_pollenated)))
-        aflfast_pollen = filter(lambda x: not x in driller_all, self.aflfast.queue)
+        aflfast_pollen = [x for x in self.aflfast.queue if x not in driller_all]
         if len(aflfast_pollen) > 0:
             self.driller.pollenate(aflfast_pollen)
         l.info('Pollenated %d into driller', len(aflfast_pollen))
@@ -125,4 +135,4 @@ class Uberfuzz(object):
     def _logging_callback(self):
         for fuzzer in self.fuzzers:
             l.info("%12s %4d queued %4d crashed", fuzzer.identifier,
-                len(fuzzer.queue), len(fuzzer.crashes))
+                   len(fuzzer.queue), len(fuzzer.crashes))
