@@ -64,8 +64,10 @@ class Uberfuzz(object):
         else:
             self.aflfast = None
 
+        self._timers = []
         self.pollenation_interval = pollenation_interval
         self._pollenation_timer = InfiniteTimer(pollenation_interval, self._pollenation_callback)
+        self._timers.append(self._pollenation_timer)
 
         self.callback_time_interval = callback_time_interval
         self.callback_fn = callback_fn
@@ -73,28 +75,27 @@ class Uberfuzz(object):
             self._callback_timer = None
         else:
             self._callback_timer = InfiniteTimer(callback_time_interval, callback_fn)
+            self._timers.append(self._callback_timer)
 
         self.logging_time_interval = logging_time_interval
-        self._logging_timer = InfiniteTimer(logging_time_interval,
-            self._logging_callback) if logging_time_interval else None
+        if logging_time_interval:
+            self._logging_timer = InfiniteTimer(logging_time_interval,
+                self._logging_callback)
+            self._timers.append(self._logging_timer)
+        else:
+            self._logging_timer = None
 
     def start(self):
         for fuzzer in self.fuzzers:
             fuzzer.start()
-        self._pollenation_timer.start()
-        if self._callback_timer:
-            self._callback_timer.start()
-        if self._logging_timer:
-            self._logging_timer.start()
+        for timer in self._timers:
+            timer.start()
 
     def kill(self):
         for fuzzer in self.fuzzers:
             fuzzer.kill()
-        self._pollenation_timer.cancel()
-        if self._callback_timer:
-            self._callback_timer.cancel()
-        if self._logging_timer:
-            self._logging_timer.cancel()
+        for timer in self._timers:
+            timer.cancel()
 
     @property
     def queue(self):
