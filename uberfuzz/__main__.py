@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import sys
 import os
 import time
@@ -9,7 +7,7 @@ import logging
 import uberfuzz
 
 
-LOG = logging.getLogger('uber-runner')
+LOG = logging.getLogger('ubermain')
 LOG.setLevel(logging.INFO)
 
 
@@ -26,12 +24,12 @@ def main(args):
         uber.kill()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Uberfuzz runner")
+    parser = argparse.ArgumentParser(prog='uberrun', description="Uberfuzz runner")
     parser.add_argument('binary', help='Binary to fuzz')
     parser.add_argument('-w', '--work-dir', help='Working directory for fuzzers',
                         default=os.path.join(os.path.dirname(__file__), "work"))
     parser.add_argument('-f', '--reads-file', help='If binary reads from a specific file')
-    parser.add_argument('--extra-opts', help='Extra cmd line options for target')
+    parser.add_argument('-e', '--extra-opts', help='Extra cmd line options for target')
     args = parser.parse_args()
 
     main(args)

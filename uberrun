@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+OPTS="$@"
+
+if [ "$OPTS" = "" ]; then
+  OPTS="-h"
+fi
+
+ipython -m uberfuzz -- $OPTS
