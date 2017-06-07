@@ -134,7 +134,7 @@ class AFLFast(ExternalFuzzer):
     '''AFL Fast interface'''
     # pylint: disable=too-many-instance-attributes,too-many-arguments
 
-    def __init__(self, binary_path, work_dir, seeds='fuzz', read_from_file=None,
+    def __init__(self, binary_path, work_dir, afl_path, seeds='fuzz', read_from_file=None,
                  target_opts=None):
         super(AFLFast, self).__init__(binary_path, work_dir, "aflfast", seeds,
                                       read_from_file, target_opts=target_opts)
@@ -144,7 +144,7 @@ class AFLFast(ExternalFuzzer):
         self.resuming = bool(os.listdir(self.sync_dir)) if os.path.isdir(self.sync_dir) else False
         self.input_dir = '-' if self.resuming else os.path.join(self.fuzzer_binary_dir, "input")
         self.process = None
-        self.afl_path = os.environ['AFLFAST_PATH']
+        self.afl_path = afl_path
 
     def start(self):
         args = [self.afl_path]

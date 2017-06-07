@@ -3,9 +3,11 @@
 import threading
 import logging
 import operator as op
+import os
 
 from .external import Driller, AFLFast
-from .score import Scorer
+# from .score import AngrScorer, LengthScorer
+from . import score
 
 
 l = logging.getLogger('uberfuzz')
@@ -52,21 +54,27 @@ class Uberfuzz(object):
     '''Let those fuzzers cooperate!'''
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, binary_path, work_dir, use_driller=True, use_aflfast=True,
-                 pollenation_interval=30, callback_time_interval=None, callback_fn=None,
-                 logging_time_interval=None, read_from_file=None, target_opts=None):
+    DEFAULT_AFLFAST_PATH = os.environ['AFLFAST_PATH'] \
+                           if os.environ.has_key('AFLFAST_PATH') else None
+
+    def __init__(self, binary_path, work_dir, pollenation_interval=30,
+                 aflfast_path=DEFAULT_AFLFAST_PATH, use_driller=True,
+                 callback_time_interval=None, callback_fn=None, target_opts=None,
+                 logging_time_interval=None, read_from_file=None, scorer=score.LengthScorer):
         # pylint: disable=too-many-arguments
         self.binary_path = binary_path
         self.work_dir = work_dir
 
-        if target_opts and '@@' in target_opts:
+        scorer_file = None
+        if scorer == score.AngrScorer and target_opts and '@@' in target_opts:
             if read_from_file:
                 scorer_file = read_from_file
                 read_from_file = None
             else:
                 # this is to allow the scorer to work properly (future TODO)
-                raise ValueError('read_from_file has to be set if giving file with @@')
-        self._scorer = Scorer(binary_path, extra_opts=target_opts, reads_file=scorer_file)
+                raise ValueError('read_from_file has to be set if giving \
+                                 file with @@ and AngrScorer')
+        self._scorer = scorer(binary_path, extra_opts=target_opts, reads_file=scorer_file)
 
         self.fuzzers = []
         if use_driller:
@@ -76,12 +84,12 @@ class Uberfuzz(object):
         else:
             self.driller = None
 
-        if use_aflfast:
-            self.aflfast = AFLFast(binary_path, work_dir, read_from_file=read_from_file,
-                                   target_opts=target_opts)
-            self.fuzzers.append(self.aflfast)
-        else:
+        if aflfast_path is None:
             self.aflfast = None
+        else:
+            self.aflfast = AFLFast(binary_path, work_dir, aflfast_path,
+                                   read_from_file=read_from_file, target_opts=target_opts)
+            self.fuzzers.append(self.aflfast)
 
         self._timers = []
         self.pollenation_interval = pollenation_interval

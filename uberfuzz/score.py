@@ -1,11 +1,11 @@
 '''main scoring module'''
+# pylint: disable=too-few-public-methods
 
 import tracer
 
 
 class Scorer(object):
     '''Gives a score to testcases'''
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, binary, extra_opts=None, reads_file=None):
         self.binary = binary
@@ -16,10 +16,26 @@ class Scorer(object):
 
     def _score(self, testcase):
         '''Score a single testcase'''
+        raise NotImplementedError('_score has to be implemented by child')
+
+    def __call__(self, testcase):
+        return self._score(testcase)
+
+
+class AngrScorer(Scorer):
+    '''Angr-based scorer'''
+
+    def _score(self, testcase):
         if self._reads_file:
             with open(self._reads_file, 'wb') as f:
                 f.write(testcase)
-        tr = tracer.Tracer(self.binary, argv=self._argv, input=testcase)
-        last_active = tr.run()
+        tracer_inst = tracer.Tracer(self.binary, argv=self._argv, input=testcase)
+        last_active = tracer_inst.run()
         return last_active[0].length
-    __call__ = _score
+
+
+class LengthScorer(Scorer):
+    '''Length-based scorer'''
+
+    def _score(self, testcase):
+        return len(testcase)
