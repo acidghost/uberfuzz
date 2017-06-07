@@ -6,4 +6,11 @@ if [ "$OPTS" = "" ]; then
   OPTS="-h"
 fi
 
-ipython -m uberfuzz -- $OPTS
+CMD="ipython -m uberfuzz --"
+
+# hackish way of passing params with whitespace...
+if [ ! "$EXTRA_OPTS" = "" ]; then
+  ipython -m uberfuzz -- $OPTS -e "${EXTRA_OPTS}"
+else
+  ipython -m uberfuzz -- $OPTS
+fi
