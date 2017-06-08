@@ -1,0 +1,6 @@
+UBERTOOLS := bbcount
+
+$(UBERTOOLS):
+	$(MAKE) dir $(OBJDIR)$(UBERTOOLS)$(PINTOOL_SUFFIX)
+
+ubertools: $(UBERTOOLS)
