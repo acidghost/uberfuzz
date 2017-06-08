@@ -19,9 +19,6 @@ KNOB<string> KnobXLibraries(KNOB_MODE_WRITEONCE, "pintool",
     "l", "", "specify shared libraries to be monitored, separated by commas");
 
 
-#define DEBUG
-
-
 static vector<pair<ADDRINT,ADDRINT> > allAddr;
 static map<ADDRINT, unsigned int> bbcount;
 static vector<string> libNames;
