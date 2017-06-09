@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
+PY="ipython"
+MOD="uberfuzz"
+CMD="$PY -m $MOD --"
+
 OPTS="$@"
-
-if [ "$OPTS" = "" ]; then
-  OPTS="-h"
+if [ "$OPTS" = "" -o "$OPTS" = "-h" ]; then
+  $CMD -h
+  exit $?
 fi
 
-CMD="ipython -m uberfuzz --"
-
-# hackish way of passing params with whitespace...
-if [ ! "$EXTRA_OPTS" = "" ]; then
-  ipython -m uberfuzz -- $OPTS -e "${EXTRA_OPTS}"
-else
-  ipython -m uberfuzz -- $OPTS
-fi
+printf "[+] Running command: $CMD"
+printf " %q" "$@"
+printf "\n"
+$CMD "$@"
